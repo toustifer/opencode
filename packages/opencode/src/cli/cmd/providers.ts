@@ -528,7 +528,9 @@ export const ProvidersLogoutCommand = effectCmd({
           }),
         )
     if (!provider) return yield* fail(`Unknown configured provider "${args.provider}"`)
-    yield* Effect.orDie(authSvc.remove(provider))
+    const credential = credentials.find(([key]) => key === provider)
+    if (!credential) return
+    yield* Effect.orDie(authSvc.remove(credential[0]))
     yield* Prompt.outro("Logout successful")
   }),
 })
