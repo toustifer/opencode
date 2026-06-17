@@ -70,7 +70,7 @@ let arch = archMap[os.arch()]
 if (!arch) {
   arch = os.arch()
 }
-const base = "forge-" + platform + "-" + arch
+const base = "forge-code-" + platform + "-" + arch
 const binary = platform === "windows" ? "forge.exe" : "forge"
 
 function supportsAvx2() {
