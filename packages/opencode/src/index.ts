@@ -34,7 +34,7 @@ const args = hideBin(process.argv)
 
 function show(out: string) {
   const text = out.trimStart()
-  if (!text.startsWith("opencode ")) {
+  if (!text.startsWith("forge ")) {
     process.stderr.write(UI.logo() + EOL + EOL)
     process.stderr.write(text + EOL)
     return
@@ -44,7 +44,7 @@ function show(out: string) {
 
 const cli = yargs(args)
   .parserConfiguration({ "populate--": true })
-  .scriptName("opencode")
+  .scriptName("forge")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -58,6 +58,14 @@ const cli = yargs(args)
     describe: "log level",
     type: "string",
     choices: ["DEBUG", "INFO", "WARN", "ERROR"],
+  })
+  .option("goal", {
+    describe: '启动 Agent Hub Leader 模式: forge --goal "添加功能" --business my-project',
+    type: "string",
+  })
+  .option("business", {
+    describe: "Agent Hub 项目代号 (与 --goal 配合使用)",
+    type: "string",
   })
   .option("pure", {
     describe: "run without external plugins",
