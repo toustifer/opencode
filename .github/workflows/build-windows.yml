@@ -28,13 +28,13 @@ jobs:
       - name: Upload Windows x64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: opencode-windows-x64
+          name: forge-windows-x64
           path: packages/opencode/dist/opencode-windows-x64/bin/
           if-no-files-found: error
 
       - name: Upload Windows arm64 artifact
         uses: actions/upload-artifact@v4
         with:
-          name: opencode-windows-arm64
+          name: forge-windows-arm64
           path: packages/opencode/dist/opencode-windows-arm64/bin/
           if-no-files-found: ignore
