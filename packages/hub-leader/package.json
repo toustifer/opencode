@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@opencode-ai/hub-leader",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "dev": "bun run src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/hub/client.ts",
+    "./planner": "./src/dag/planner.ts",
+    "./dispatcher": "./src/dispatch/dispatcher.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "3.0.82",
+    "@ai-sdk/openai": "3.0.53",
+    "ai": "catalog:",
+    "effect": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}

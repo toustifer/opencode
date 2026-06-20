@@ -1,3 +1,5 @@
+import fs from "fs"
+import path from "path"
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import { RunCommand } from "./cli/cmd/run"
@@ -21,16 +23,75 @@ import { ImportCommand } from "./cli/cmd/import"
 import { AttachCommand } from "./cli/cmd/attach"
 import { TuiThreadCommand } from "./cli/cmd/tui"
 import { AcpCommand } from "./cli/cmd/acp"
-import { EOL } from "os"
 import { WebCommand } from "./cli/cmd/web"
 import { PrCommand } from "./cli/cmd/pr"
 import { SessionCommand } from "./cli/cmd/session"
 import { DbCommand } from "./cli/cmd/db"
 import { errorMessage } from "./util/error"
 import { PluginCommand } from "./cli/cmd/plug"
+import { ReviewCommand } from "./cli/cmd/review"
+import { InitCommand } from "./cli/cmd/init"
 import { Heap } from "./cli/heap"
+import { EOL } from "os"
+import { createInterface } from "readline"
+
+// ── Agent Hub 检测 ──
+
+function findMycompanyDir(): string | null {
+  let dir = process.cwd()
+  while (true) {
+    try {
+      if (fs.statSync(path.join(dir, ".mycompany")).isDirectory()) return dir
+    } catch {
+      /* not found */
+    }
+    const parent = path.dirname(dir)
+    if (parent === dir) return null
+    dir = parent
+  }
+}
+
+function readMycompanyCfg(dir: string): Record<string, unknown> {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, ".mycompany", "config.json"), "utf-8"))
+  } catch {
+    return {}
+  }
+}
+
+function goalFromArgs(rawArgs: string[]): string | undefined {
+  const idx = rawArgs.indexOf("--goal")
+  if (idx === -1) return undefined
+  const val = rawArgs[idx + 1]
+  return val && !val.startsWith("-") ? val : undefined
+}
+
+function businessFromArgs(rawArgs: string[]): string | undefined {
+  const idx = rawArgs.indexOf("--business")
+  if (idx === -1) return undefined
+  const val = rawArgs[idx + 1]
+  return val && !val.startsWith("-") ? val : undefined
+}
+
+// ── 模式判断（在 yargs 之前执行）──
+
+const rawArgs = process.argv.slice(2)
+const mycompanyDir = findMycompanyDir()
+const mycompanyCfg = mycompanyDir ? readMycompanyCfg(mycompanyDir) : {}
+const isHelp = rawArgs.includes("-h") || rawArgs.includes("--help")
+const isVersion = rawArgs.includes("-v") || rawArgs.includes("--version")
+const hasGoal = rawArgs.includes("--goal")
+const firstArg = rawArgs[0] || ""
+const hasSubcommand = firstArg.length > 0 && !firstArg.startsWith("-")
+
+// 无 .mycompany/ + 无参数 → 自动进入对话模式
+if (!mycompanyDir && !hasGoal && !isHelp && !isVersion && !hasSubcommand) {
+  process.argv = [process.argv[0], process.argv[1], "run", "-i"]
+}
 
 const args = hideBin(process.argv)
+
+// ── yargs 配置 ──
 
 function show(out: string) {
   const text = out.trimStart()
@@ -60,7 +121,7 @@ const cli = yargs(args)
     choices: ["DEBUG", "INFO", "WARN", "ERROR"],
   })
   .option("goal", {
-    describe: '启动 Agent Hub Leader 模式: forge --goal "添加功能" --business my-project',
+    describe: '启动 Leader 模式: forge --goal "添加功能" --business my-project',
     type: "string",
   })
   .option("business", {
@@ -104,10 +165,12 @@ const cli = yargs(args)
   .command(StatsCommand)
   .command(ExportCommand)
   .command(ImportCommand)
+  .command(InitCommand)
   .command(GithubCommand)
   .command(PrCommand)
   .command(SessionCommand)
   .command(PluginCommand)
+  .command(ReviewCommand)
   .command(DbCommand)
   .fail((msg, err) => {
     if (
@@ -124,24 +187,68 @@ const cli = yargs(args)
   .strict()
 
 try {
-  // Forge 默认行为：无参数时进入 Leader 交互模式
-  const hasGoal = args.includes("--goal") || args.some(a => !a.startsWith("-"))
-  const isHelp = args.includes("-h") || args.includes("--help")
-  const isVersion = args.includes("-v") || args.includes("--version")
+  // ── Leader 模式（--goal）──
+  if (hasGoal && !isHelp && !isVersion) {
+    const { runGoal } = await import("@opencode-ai/hub-leader")
+    const goal = goalFromArgs(rawArgs)
+    if (!goal) {
+      UI.error("请提供目标: forge --goal \"你的目标\" --business 项目代号" + EOL)
+      process.exit(1)
+    }
+    const business = businessFromArgs(rawArgs) ?? (mycompanyCfg.businessCode as string) ?? (mycompanyCfg.projectName as string)
+    if (!business) {
+      UI.error("请提供 --business 项目代号，或在 .mycompany/config.json 中设置 businessCode" + EOL)
+      process.exit(1)
+    }
 
-  if (isHelp) {
+    console.log(EOL + "\x1b[36m━━━ Forge Code — Leader 模式 ━━━\x1b[0m" + EOL)
+    await runGoal({
+      goal,
+      business,
+      baseUrl: (mycompanyCfg.hubUrl as string) ?? "https://hub.stifer.xyz",
+      cwd: mycompanyDir ?? process.cwd(),
+      opencodeBin: "forge",
+    })
+    process.exit(0)
+  }
+
+  // ── Leader 交互模式（有 .mycompany/，无 --goal）──
+  if (mycompanyDir && !hasGoal && !isHelp && !isVersion && !hasSubcommand) {
+    const { runGoal } = await import("@opencode-ai/hub-leader")
+    const projectName = (mycompanyCfg.projectName as string) ?? path.basename(mycompanyDir)
+
+    console.log(EOL + "\x1b[36m━━━ Forge Code — Leader 模式 ━━━\x1b[0m")
+    console.log(`  项目: ${projectName}`)
+    console.log(`  目录: ${mycompanyDir}${EOL}`)
+
+    const goal = await askForGoal()
+    if (!goal) {
+      console.log("未输入目标，退出。")
+      process.exit(0)
+    }
+
+    await runGoal({
+      goal,
+      business: (mycompanyCfg.businessCode as string) ?? projectName,
+      baseUrl: (mycompanyCfg.hubUrl as string) ?? "https://hub.stifer.xyz",
+      cwd: mycompanyDir,
+      opencodeBin: "forge",
+    })
+    process.exit(0)
+  }
+
+  // ── 正常 yargs 流程 ──
+  const yargsIsHelp = args.includes("-h") || args.includes("--help")
+  const yargsIsVersion = args.includes("-v") || args.includes("--version")
+
+  if (yargsIsHelp) {
     await cli.parse(args, (err: Error | undefined, _argv: unknown, out: string) => {
       if (err) throw err
       if (!out) return
       show(out)
     })
-  } else if (!hasGoal && !isVersion) {
-    // 无参数 → Leader 模式欢迎
-    await cli.parse(["--help"])
-    console.log(EOL + "\x1b[36m━━━ Forge Code — Leader 模式 ━━━\x1b[0m" + EOL)
-    console.log("用法:  forge --goal \"你的目标\" --business 项目代号")
-    console.log("       forge init         初始化工作空间")
-    console.log("       forge chat         进入对话模式" + EOL)
+  } else if (yargsIsVersion) {
+    await cli.parse()
   } else {
     await cli.parse()
   }
@@ -155,4 +262,25 @@ try {
   process.exitCode = 1
 } finally {
   process.exit()
+}
+
+// ── 交互式输入 ──
+
+async function askForGoal(): Promise<string | null> {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stderr,
+    terminal: true,
+  })
+  return new Promise((resolve) => {
+    process.stderr.write("\x1b[33m? 输入目标（回车确认，Ctrl+C 取消）:\x1b[0m\n")
+    rl.question("> ", (answer) => {
+      rl.close()
+      resolve(answer.trim() || null)
+    })
+    rl.on("SIGINT", () => {
+      rl.close()
+      resolve(null)
+    })
+  })
 }
