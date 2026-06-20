@@ -79,7 +79,8 @@ export async function runGoal(opts: RunGoalOpts): Promise<void> {
     apiKey: process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY,
     baseURL: process.env.LLM_BASE_URL || "https://api.deepseek.com/v1",
   })
-  const model = compatible.chatModel(opts.model ?? "deepseek-chat")
+  const modelName = (opts.model ?? "deepseek-chat").replace(/^deepseek\//, "")
+  const model = compatible.chatModel(modelName)
 
   const { plan } = await planDag(model, {
     goal: opts.goal,
