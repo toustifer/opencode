@@ -7,7 +7,7 @@ on:
         description: "Version tag (e.g. v0.1.0)"
         required: true
   push:
-    tags: ["v*"]
+    tags: ["v*", "forge-code-v*"]
 
 permissions:
   contents: write
