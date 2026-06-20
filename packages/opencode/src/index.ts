@@ -202,12 +202,14 @@ try {
     }
 
     console.log(EOL + "\x1b[36m━━━ Forge Code — Leader 模式 ━━━\x1b[0m" + EOL)
+    const settings = readSettings()
     await runGoal({
       goal,
       business,
       baseUrl: (mycompanyCfg.hubUrl as string) ?? "https://hub.stifer.xyz",
       cwd: mycompanyDir ?? process.cwd(),
       opencodeBin: "forge",
+      token: settings.token as string | undefined,
     })
     process.exit(0)
   }
@@ -227,12 +229,14 @@ try {
       process.exit(0)
     }
 
+    const settings = readSettings()
     await runGoal({
       goal,
       business: (mycompanyCfg.businessCode as string) ?? projectName,
       baseUrl: (mycompanyCfg.hubUrl as string) ?? "https://hub.stifer.xyz",
       cwd: mycompanyDir,
       opencodeBin: "forge",
+      token: settings.token as string | undefined,
     })
     process.exit(0)
   }
