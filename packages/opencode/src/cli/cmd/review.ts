@@ -181,34 +181,56 @@ Be fair: use the reviewer playbook standards, not personal opinions.`
     .filter(Boolean)
     .join("\n")
 
-  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY
-  const baseUrl = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com"
-  const model = process.env.FORGE_REVIEW_MODEL || "claude-sonnet-4-20250514"
+  const apiKey = process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY
+  const baseUrl = process.env.ANTHROPIC_BASE_URL || process.env.LLM_BASE_URL
+  const model = process.env.FORGE_REVIEW_MODEL || "deepseek-chat"
+  const isAnthropic = !baseUrl || baseUrl.includes("anthropic")
 
   if (!apiKey) {
     return {
       passed: true,
       score: 50,
-      reasons: ["⚠️  No ANTHROPIC_API_KEY configured — review skipped automatically"],
-      suggestions: ["Set ANTHROPIC_AUTH_TOKEN in environment to enable review"],
+      reasons: ["⚠️  No API key configured — review skipped automatically"],
+      suggestions: ["Set ANTHROPIC_AUTH_TOKEN or LLM_API_KEY in environment to enable review"],
     }
   }
 
   try {
-    const response = await fetch(`${baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 2000,
-        system: [{ type: "text", text: systemPrompt }],
-        messages: [{ role: "user", content: [{ type: "text", text: userPrompt }] }],
-      }),
-    })
+    let response
+    if (isAnthropic) {
+      response = await fetch(`${baseUrl || "https://api.anthropic.com"}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 2000,
+          system: [{ type: "text", text: systemPrompt }],
+          messages: [{ role: "user", content: [{ type: "text", text: userPrompt }] }],
+        }),
+      })
+    } else {
+      // OpenAI-compatible endpoint (DeepSeek, etc.)
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model.replace(/^deepseek\//, ""),
+          max_tokens: 2000,
+          temperature: 0.3,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+      })
+    }
 
     if (!response.ok) {
       const errBody = await response.text()
