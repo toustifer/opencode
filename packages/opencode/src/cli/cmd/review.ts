@@ -243,7 +243,13 @@ Be fair: use the reviewer playbook standards, not personal opinions.`
     }
 
     const data = await response.json()
-    const text = data.content?.[0]?.text || ""
+    // Handle both Anthropic ({content: [{text: ...}}]}) and OpenAI ({choices: [{message: {content: ...}}]}) response formats
+    let text = ""
+    if (data.content?.[0]?.text) {
+      text = data.content[0].text
+    } else if (data.choices?.[0]?.message?.content) {
+      text = data.choices[0].message.content
+    }
 
     // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/)
