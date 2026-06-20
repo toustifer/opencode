@@ -22,11 +22,13 @@ jobs:
         with:
           bun-version: "1.3.14"
 
+      - name: Install deps from root
+        run: |
+          bun install --no-frozen-lockfile 2>&1 | tail -3
+
       - name: Build all platforms
         run: |
-          cd packages/opencode
-          bun install 2>&1 | tail -5
-          bun run build
+          bun run --cwd packages/opencode build
         env:
           OPENCODE_CHANNEL: "release"
 
