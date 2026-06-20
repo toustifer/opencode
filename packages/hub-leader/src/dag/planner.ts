@@ -1,31 +1,33 @@
-import { generateObject, type LanguageModel } from "ai"
-import { DagPlanSchema, type PlanningContext, type DagPlan } from "./types"
+import { generateText, type LanguageModel } from "ai"
+import { type PlanningContext, type DagPlan } from "./types"
 
-const PLANNER_SYSTEM_PROMPT = `You are a DAG Planner — a strategic task decomposition agent for the Agent Hub system.
-
-## Your Role
-You receive a user goal and context from the Agent Hub (available workers, playbooks, recent events). You produce a structured execution plan: a directed acyclic graph (DAG) of tasks with dependencies.
-
-## Hub Context Types
-- **Workers**: Persistent domain agents. Each has a worker_id, status, and handbook (experience). Use the right worker for each task.
-- **Playbooks**: Reusable skill patterns (like code snippets for agents). Tag them for injection into worker context.
-- **Events**: Recent activity. Use to avoid re-doing completed work.
+const PLANNER_SYSTEM_PROMPT = `You are a DAG Planner — a strategic task decomposition agent for the Agent Hub system. You receive a user goal and produce a structured execution plan as a JSON object.
 
 ## Planning Rules
-1. **Decompose the goal** into concrete, atomic tasks. Each task should be completable by a single worker in one session.
-2. **Assign workers** based on domain match between task scope and worker handbook. When uncertain, assign to "general".
-3. **Identify dependencies**: what must complete before what. Keep the DAG as parallel as possible.
-4. **Tag required skills**: for each task, pick playbook tags that the worker should have in context.
-5. **Max 8 tasks** per plan. If the goal is larger, group sub-tasks.
-6. **Critical path**: identify the longest dependency chain.
+1. Decompose the goal into 2-6 concrete, atomic tasks
+2. Assign workers based on domain match, or "general" when uncertain
+3. Identify dependencies between tasks
+4. Keep the DAG as parallel as possible
+5. Identify critical path and risks
 
-## Output Format
-Strict JSON matching the DagPlan schema:
-- goal: restate the goal clearly
-- analysis: 2-3 sentence approach summary
-- tasks: ordered array with task_id, title, description, assigned_worker, dependencies, required_skills, estimated_complexity
-- critical_path: task_ids on the longest chain
-- risks: any foreseen issues`
+## Output Format — return ONLY valid JSON, no markdown, no code fences:
+{
+  "goal": "restate the goal",
+  "analysis": "2-3 sentence approach summary",
+  "tasks": [
+    {
+      "task_id": "1",
+      "title": "short title",
+      "description": "what to do",
+      "assigned_worker": "general",
+      "dependencies": [],
+      "required_skills": [],
+      "estimated_complexity": "medium"
+    }
+  ],
+  "critical_path": ["1", "2"],
+  "risks": ["risk 1"]
+}`
 
 export function buildPlanningPrompt(ctx: PlanningContext): string {
   const workerList = ctx.available_workers
@@ -65,12 +67,18 @@ export async function planDag(
   ctx: PlanningContext,
 ): Promise<{ plan: DagPlan; prompt: string }> {
   const prompt = buildPlanningPrompt(ctx)
-  const result = await generateObject({
+  const result = await generateText({
     model,
-    schema: DagPlanSchema,
     system: PLANNER_SYSTEM_PROMPT,
     prompt,
     temperature: 0.3,
   })
-  return { plan: result.object as DagPlan, prompt }
+  // Parse JSON from text response (handle both plain JSON and code-fenced JSON)
+  const text = result.text.trim()
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error("No JSON object found in planner response")
+  }
+  const plan = JSON.parse(jsonMatch[0]) as DagPlan
+  return { plan, prompt }
 }
