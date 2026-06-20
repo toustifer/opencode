@@ -24,7 +24,8 @@ jobs:
 
       - name: Install deps from root
         run: |
-          bun install --no-frozen-lockfile 2>&1 | tail -3
+          rm -f bun.lock bun.lockb
+          bun install 2>&1 | tail -5
 
       - name: Build all platforms
         run: |
