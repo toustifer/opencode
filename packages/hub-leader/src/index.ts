@@ -278,12 +278,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// ── Run ──
-
-main().catch((err) => {
-  console.error("Fatal:", err)
-  process.exit(1)
-})
+// ── Run (only when executed directly, not when imported by forge) ──
+const isMainModule = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"))
+if (isMainModule) {
+  main().catch((err) => {
+    console.error("Fatal:", err)
+    process.exit(1)
+  })
+}
 
 // ── Re-exports ──
 
