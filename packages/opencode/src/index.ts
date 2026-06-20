@@ -124,12 +124,24 @@ const cli = yargs(args)
   .strict()
 
 try {
-  if (args.includes("-h") || args.includes("--help")) {
+  // Forge 默认行为：无参数时进入 Leader 交互模式
+  const hasGoal = args.includes("--goal") || args.some(a => !a.startsWith("-"))
+  const isHelp = args.includes("-h") || args.includes("--help")
+  const isVersion = args.includes("-v") || args.includes("--version")
+
+  if (isHelp) {
     await cli.parse(args, (err: Error | undefined, _argv: unknown, out: string) => {
       if (err) throw err
       if (!out) return
       show(out)
     })
+  } else if (!hasGoal && !isVersion) {
+    // 无参数 → Leader 模式欢迎
+    await cli.parse(["--help"])
+    console.log(EOL + "\x1b[36m━━━ Forge Code — Leader 模式 ━━━\x1b[0m" + EOL)
+    console.log("用法:  forge --goal \"你的目标\" --business 项目代号")
+    console.log("       forge init         初始化工作空间")
+    console.log("       forge chat         进入对话模式" + EOL)
   } else {
     await cli.parse()
   }
@@ -142,9 +154,5 @@ try {
   }
   process.exitCode = 1
 } finally {
-  // Some subprocesses don't react properly to SIGTERM and similar signals.
-  // Most notably, some docker-container-based MCP servers don't handle such signals unless
-  // run using `docker run --init`.
-  // Explicitly exit to avoid any hanging subprocesses.
   process.exit()
 }
