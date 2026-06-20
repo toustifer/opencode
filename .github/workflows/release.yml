@@ -1,0 +1,89 @@
+name: Release Forge Code
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g. v0.1.0)"
+        required: true
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      - name: Build all platforms
+        run: |
+          cd packages/opencode
+          bun run build
+        env:
+          OPENCODE_CHANNEL: "release"
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          cd packages/opencode/dist
+          for dir in */; do
+            name="${dir%/}"
+            platform="${name#forge-code-}"
+            if [ -f "$dir/bin/forge" ]; then
+              tar czf "../../../dist/forge-code-${platform}.tar.gz" -C "$dir/bin" forge
+            elif [ -f "$dir/bin/forge.exe" ]; then
+              zip -j "../../../dist/forge-code-${platform}.zip" "$dir/bin/forge.exe"
+            fi
+          done
+          cd ../../..
+          echo "Packaged:"
+          ls -lh dist/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Forge Code ${{ github.ref_name }}"
+          body: |
+            # Forge Code ${{ github.ref_name }}
+
+            ## 安装方式
+
+            ### macOS (Apple Silicon)
+            ```bash
+            tar xzf forge-code-darwin-arm64.tar.gz
+            sudo mv forge /usr/local/bin/forge
+            ```
+
+            ### macOS (Intel)
+            ```bash
+            tar xzf forge-code-darwin-x64.tar.gz
+            sudo mv forge /usr/local/bin/forge
+            ```
+
+            ### Windows
+            解压 `forge-code-windows-x64.zip`，将 `forge.exe` 放到 PATH 目录。
+
+            ### Linux
+            ```bash
+            tar xzf forge-code-linux-x64.tar.gz
+            sudo mv forge /usr/local/bin/forge
+            ```
+
+            ## 使用
+            ```bash
+            forge --goal "你的目标" --business 项目代号
+            ```
+          files: dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: false
