@@ -32,7 +32,7 @@ import { PluginCommand } from "./cli/cmd/plug"
 import { ReviewCommand } from "./cli/cmd/review"
 import { InitCommand } from "./cli/cmd/init"
 import { Heap } from "./cli/heap"
-import { EOL } from "os"
+import { EOL, homedir } from "os"
 import { createInterface } from "readline"
 
 // ── Agent Hub 检测 ──
@@ -48,6 +48,15 @@ function findMycompanyDir(): string | null {
     const parent = path.dirname(dir)
     if (parent === dir) return null
     dir = parent
+  }
+}
+
+function readSettings(): Record<string, unknown> {
+  try {
+    const p = path.join(homedir(), ".config", "forge", "settings.json")
+    return JSON.parse(fs.readFileSync(p, "utf-8"))
+  } catch {
+    return {}
   }
 }
 
