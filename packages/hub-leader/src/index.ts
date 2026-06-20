@@ -16,7 +16,7 @@ import { HubClient, type HubConfig } from "./hub"
 import { planDag } from "./dag/planner"
 import { dispatchDag } from "./dispatch/dispatcher"
 import type { DagTask } from "./hub/types"
-import { createOpenAI } from "@ai-sdk/openai"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 
 // ── Public API ──
 
@@ -74,11 +74,12 @@ export async function runGoal(opts: RunGoalOpts): Promise<void> {
 
   // 3. Plan DAG with LLM
   console.log("\n🧠 Planning DAG...")
-  const openai = createOpenAI({
+  const compatible = createOpenAICompatible({
+    name: "deepseek",
     apiKey: process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || process.env.LLM_API_KEY,
     baseURL: process.env.LLM_BASE_URL || "https://api.deepseek.com/v1",
   })
-  const model = openai(opts.model ?? "deepseek-chat")
+  const model = compatible.chatModel(opts.model ?? "deepseek-chat")
 
   const { plan } = await planDag(model, {
     goal: opts.goal,
