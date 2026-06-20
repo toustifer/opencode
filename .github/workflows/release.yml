@@ -39,16 +39,18 @@ jobs:
           cd packages/opencode/dist
           for dir in */; do
             name="${dir%/}"
-            platform="${name#forge-code-}"
+            platform="${name#opencode-}"
+            binfile="forge"
+            [ "$(uname -s | cut -c1-5)" = "MINGW" ] && binfile="forge.exe"
             if [ -f "$dir/bin/forge" ]; then
               tar czf "../../../dist/forge-code-${platform}.tar.gz" -C "$dir/bin" forge
+              echo "  forge-code-${platform}.tar.gz"
             elif [ -f "$dir/bin/forge.exe" ]; then
               zip -j "../../../dist/forge-code-${platform}.zip" "$dir/bin/forge.exe"
+              echo "  forge-code-${platform}.zip"
             fi
           done
           cd ../../..
-          echo "Packaged:"
-          ls -lh dist/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
